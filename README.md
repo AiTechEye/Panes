@@ -1,7 +1,6 @@
-# Panes app manu
-## Version 3
+# Panes app manu, Version 3
 
-[youtube](https://www.youtube.com/watch?v=zmcaFThOKlw)
+[Youtube](https://www.youtube.com/watch?v=zmcaFThOKlw)
 
 [Download the last build](https://github.com/AiTechEye/Panes/releases)
 
