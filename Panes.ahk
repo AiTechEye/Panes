@@ -10,7 +10,6 @@ Items_MaxHeight := 6
 Settings_File := "Panes.ini"
 Filter := "desktop.ini conf.ini"Settings_File
 PanesIcones := StrSplit(GetSetting("icons-for-items"),",")
-DoNotReTryDLIco := StrSplit(GetSetting("DoNotReTryDLIco"),",")
 AlsoShowThisFolder := StrSplit(GetSetting("Include-Folder"),",")
 
 Fade_duration := 100
