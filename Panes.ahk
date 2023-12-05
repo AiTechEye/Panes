@@ -2,15 +2,17 @@
 
 CoordMode, Mouse, Screen
 MouseGetPos, px, py
-
 Item_WSpace := 16
 Item_HSpace := 16
 Icon_Size := 32
 Items_MaxWidth := 6
 Items_MaxHeight := 6
-
 Settings_File := "Panes.ini"
-Filter := "desktop.ini "Settings_File
+Filter := "desktop.ini conf.ini"Settings_File
+PanesIcones := StrSplit(GetSetting("icons-for-items"),",")
+DoNotReTryDLIco := StrSplit(GetSetting("DoNotReTryDLIco"),",")
+AlsoShowThisFolder := StrSplit(GetSetting("Include-Folder"),",")
+
 Fade_duration := 100
 Subfolder := 0
 Current_folder := A_WorkingDir
@@ -19,10 +21,11 @@ Window_Flag_Show := 131072
 Window_Flag_Hide := 65536
 Window_Flag_Fade_Show := Window_Flag_Fade + Window_Flag_Show
 Window_Flag_Fade_Hide := Window_Flag_Fade + Window_Flag_Hide 
-
 ; ======================= Setup
 
 Start:
+Selected_Folder := ""
+Selected_Item := ""
 Objects := {}
 Items := {}
 x := 8
@@ -31,7 +34,6 @@ itemy := Icon_Size
 scroll := Icon_Size
 
 ; ======================= Window
-
 Theme_color := GetSetting("theme-color")
 Theme_Transparency := GetSetting("theme-transparency")
 
@@ -41,45 +43,86 @@ if (Theme_color == "")
 if (Theme_Transparency == "")
 	Theme_Transparency := true
 
-
 SplitPath Current_folder,DirName
 Gui, 1: +owner -SysMenu -Caption +hWndhGui1 +LastFound 
-Gui, 1: Font, s12 bold, Segoe UI
-Gui, Add, Text,cWhite x8 y4 vLabel, %DirName%
 Gui, 1: Font, s8 bold, Segoe UI
 
 Items["Label"] := 4
 
 ; ======================= Items
 
-Loop, Files,%Current_folder%\*.*,DF
-{
-	if (A_LoopFileExt != "" and InStr(Filter,A_LoopFileExt) or A_LoopFileName == A_ScriptName) {
-		continue
+index := 0
+Folders := AlsoShowThisFolder.clone()
+Folders.InsertAt(0,Current_folder)
+
+if (Folders[Folders.MaxIndex()] == ""){
+	Folders.pop()
+}
+
+for i, fold in Folders {
+	if (i > 0) {
+		itemy += (Icon_Size+Item_WSpace)*1.5
+	}
+	SplitPath, fold,,,, dirname
+	x = 8
+	y += (Icon_Size+Item_WSpace)*2
+	new_label_y := 8+itemy-Icon_Size
+	new_line_y := itemy-Item_WSpace
+
+	if (AlsoShowThisFolder.MaxIndex() > 0) {
+		Gui, Add, Progress, x%Item_WSpace% y%new_line_y% w290 h2 BackgroundWhite vItemLine%index%
+		key = Line%index%
+		Items[key] := itemy
+		Items["ItemLine"index] := new_line_y
 	}
 
-	ty := itemy+Icon_Size
-	tx := x-Icon_Size/3
-	text := SubStr(A_LoopFileName,1,6)
-	Gui, Add, Text, w%Icon_Size% h%Icon_Size% X%x% Y%itemy% 0x3 hwndiconid1 gItemSelected vItems%A_index% ; , Items%A_index%
-	SendMessage, STM_SETICON := 0x0170, GetFileIcon(A_LoopFileLongPath), 0,, Ahk_ID %iconid1%
-	Gui, Add, Text,cWhite xp y%ty% vItemText%A_index%, %text%
-	key = Items%A_index%
-	Objects[key] := A_LoopFileLongPath
-	Items[key] := itemy
-	Items["ItemText"A_index] := ty
+	Gui, 1: Font, s12 bold, Segoe UI
+	Gui, Add, Text,cWhite x8 y%new_label_y% vItemLabel%index%, %dirname% 
+	Gui, 1: Font, s8 bold, Segoe UI
 
-	x += Icon_Size + Item_WSpace
-	if (x > (Icon_Size + Item_WSpace)*Items_MaxWidth){
-		x = 8
-		itemy += Icon_Size+Item_WSpace
-		if (y < Items_MaxWidth*Icon_Size+Item_WSpace) {
-			y := itemy
+	key = Label%index%
+	Items[key] := itemy
+	Items["ItemLabel"index] := new_line_y
+
+	Loop, Files,%fold%\*.*,DF
+	{
+		index += 1
+		if (A_LoopFileExt != "" and InStr(Filter,A_LoopFileExt) or A_LoopFileName == A_ScriptName) {
+			continue
+		}
+
+		ty := itemy+Icon_Size
+		tx := x-Icon_Size/3
+		text := SubStr(A_LoopFileName,1,6)
+		Gui, Add, Text, w%Icon_Size% h%Icon_Size% X%x% Y%itemy% 0x3 hwndiconid1 gItemSelected vItems%index%
+
+		icon := GetIconForItem(A_LoopFileFullPath)
+
+		if (icon != "") {
+			SendMessage, STM_SETICON := 0x0170, icon, 0,, Ahk_ID %iconid1%
+		} else {
+			SendMessage, STM_SETICON := 0x0170, GetFileIcon(A_LoopFileLongPath), 0,, Ahk_ID %iconid1%
+		}
+
+		Gui, Add, Text,cWhite xp y%ty% vItemText%index%, %text%
+		key = Items%index%
+		Objects[key] := A_LoopFileLongPath
+		Items[key] := itemy
+		Items["ItemText"index] := ty
+
+		x += Icon_Size + Item_WSpace
+		if (x > (Icon_Size + Item_WSpace)*Items_MaxWidth){
+			x = 8
+			itemy += Icon_Size+Item_WSpace
+			if (y < Items_MaxWidth*Icon_Size+Item_WSpace) {
+				y := itemy
+			}
 		}
 	}
-}
-wh := y+32+16
 
+}
+
+wh := y+32+16
 
 ; ======================= Window pos/size
 
@@ -131,9 +174,10 @@ WinActivate, ahk_id %GuiID%
 
 ; ======================= ContextMenu & Settings:
 
+Menu, Menu1, Add, Also show this folder, AlsoShowFolder
+Menu, Menu1, Add, Change Icon, ChengeIcon
 Menu, Menu1, Add, Open Folder, OpenBaseFolder
 Menu, Menu1, Add, Open Settings..., ShowSettings
-
 
 Gui, 2:  +owner -SysMenu +Caption +hWndhGui1 +LastFound 
 Gui, 2: Add, Button, x0 y0 w70 h20 gPickColor, Pick a color
@@ -145,19 +189,20 @@ Gui, 2: Show, x%xx% y%yy% w200 h40 Hide,Panes settings
 WinSet, ALwaysOnTop, on,Panes settings
 
 Settings_window := WinExist()
+
 return
 
 ; ======================= Functions
 
 *WheelUP::
 	my := Icon_Size+Item_WSpace
-	if (scroll >= Icon_Size+Icon_Size) {
+	 if (scroll >= Icon_Size+Icon_Size) {
 		scroll -= my
 		for key, v in Items {
 			v += my
 			Items[key] := v
 			GuiControl, Move, %key%,y%v%
-		}
+	}
 	}
 return
 *WheelDown::
@@ -238,9 +283,94 @@ EnableBlur(hWnd) {
 
 
 GuiContextMenu(GuiHwnd, CtrlHwd, EventInfo, IsRightClick, x, y) {
+	Global Objects, AlsoShowThisFolder, PanesIcones
+	file := Objects[A_GuiControl]
+
+	Menu, Menu1, UnCheck,Also show this folder
+
+	if (Instr(FileExist(file),"D")) {
+		Menu, Menu1, Enable,Also show this folder
+		Selected_Folder := file
+		for i, line in AlsoShowThisFolder {
+			if (line == file) {
+				Menu, Menu1, Check,Also show this folder
+				break
+			}
+		}
+	} else {
+		Menu, Menu1, Disable,Also show this folder
+	}
+
+	if (FileExist(file)) {
+		Selected_Item := file
+		Menu, Menu1, Enable,Change Icon
+		Menu, Menu1, UnCheck,Change Icon
+		for i, line in PanesIcones {
+			f := StrSplit(line,"*")
+			if (file == f[1]) {
+				Menu, Menu1, Check,Change Icon
+				break
+			}
+		}
+	} else {
+		Menu, Menu1, Disable,Change Icon
+	}
+
 	Menu, Menu1, show
 }
 return
+
+
+ChengeIcon:
+	Global Selected_Item
+
+	SetTimer, Timer, Off
+	text := GetSetting("icons-for-items")
+	item := inStr(text,Selected_Item "*")
+	if (item > 0) {
+		iend := inStr(text,item,",")
+		dirico := SubStr(text,item,iend-item+2)
+		text := StrReplace(text,dirico,"")
+	} else {
+
+		FileSelectFile, file,,,Select icon file,*.ico
+		SplitPath, file, path, fullfile, filetype, filename
+
+		if (filetype == "") {
+			SetTimer Timer
+			return
+		} else if (filetype != "ico") {
+			msgbox,48,Error,Icon (.ico) Is supported Only
+			SetTimer Timer
+			return
+		}
+		text := text Selected_Item "*" file ","
+
+	}
+	UpdateSetting("icons-for-items",text)
+	PanesIcones := StrSplit(GetSetting("icons-for-items"),",")
+	Gui 1: Destroy
+	Gui 2: Destroy
+	Gosub, Start
+return
+
+AlsoShowFolder:
+	Global Selected_Folder
+	text := GetSetting("Include-Folder")
+	if (inStr(text,Selected_Folder ",") > 0) {
+		text := StrReplace(text,Selected_Folder ",","")
+	} else {
+		text := text Selected_Folder ","
+	}
+	AlsoShowThisFolder := StrSplit(text,",")
+	UpdateSetting("Include-Folder",text)
+
+	SetTimer, Timer, Off
+	Gui 1: Destroy
+	Gui 2: Destroy
+	Gosub, Start
+return
+
 OpenBaseFolder:
 	run, %Current_folder%
 return
@@ -364,4 +494,35 @@ Load() {
 	a := File.read()
 	File.close()
 	return a
+}
+
+LoadFile(file) {
+	File := FileOpen(file,"r")
+	a := File.read()
+	File.close()
+	return a
+}
+
+GetIconForItem(file) {
+	GLOBAL PanesIcones
+	for i, line in PanesIcones {
+		f := StrSplit(line,"*")
+		if (file == f[1] and FileExist(f[2])) {
+			return LoadIcon(f[2])
+		}
+	}
+}
+
+LoadIcon(img) {
+	FileRead,buf,*c %img%
+	icon := DllCall("CreateIconFromResourceEx"
+	,UInt,&buf+22
+	,UInt,NumGet(buf,14)
+	,Int,1
+	,UInt,0x30000
+	,UInt,48
+	,UInt,48
+	,UInt,0
+	,Ptr)
+	return icon
 }
