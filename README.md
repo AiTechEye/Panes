@@ -1,4 +1,4 @@
-# Panes app manu, Version 4
+# Panes app manu, Version 4.1
 
 [Youtube (V3)](https://www.youtube.com/watch?v=zmcaFThOKlw)
 
