@@ -1,9 +1,12 @@
 #SingleInstance, Force
 
+Version := 4.1
 CoordMode, Mouse, Screen
 MouseGetPos, px, py
 Item_WSpace := 16
 Item_HSpace := 16
+Mouse_pos_x := 0
+Mouse_pos_y := 0
 Icon_Size := 32
 Items_MaxWidth := 6
 Items_MaxHeight := 6
@@ -25,6 +28,7 @@ Window_Flag_Fade_Hide := Window_Flag_Fade + Window_Flag_Hide
 Start:
 Selected_Folder := ""
 Selected_Item := ""
+listed_directories := {}
 Objects := {}
 Items := {}
 x := 8
@@ -78,6 +82,11 @@ for i, fold in Folders {
 	Gui, 1: Font, s12 bold, Segoe UI
 	Gui, Add, Text,cWhite x8 y%new_label_y% vItemLabel%index%, %dirname% 
 	Gui, 1: Font, s8 bold, Segoe UI
+	dir := {}
+	dir.y := new_label_y
+	dir.folder := fold
+	dir.label := "ItemLabel" index
+	listed_directories.InsertAt(0,dir)
 
 	key = Label%index%
 	Items[key] := itemy
@@ -178,16 +187,28 @@ Menu, Menu1, Add, Change Icon, ChengeIcon
 Menu, Menu1, Add, Open Folder, OpenBaseFolder
 Menu, Menu1, Add, Open Settings..., ShowSettings
 
-Gui, 2:  +owner -SysMenu +Caption +hWndhGui1 +LastFound 
+Gui, 2: +owner -SysMenu +Caption +hWndhGui1 +LastFound 
 Gui, 2: Add, Button, x0 y0 w70 h20 gPickColor, Pick a color
+Gui, 2: Add, Button, x160 y20 w40 h20 gAbout, About
 Gui, 2: Add, Edit, vColorInput gKColorInput x70 y0 w50
 Gui, 2: Add, Checkbox, x120 y0 w100 h20 gSetEnableTransparency vEnableTransparency,Transparent
 Gui, 2: Add, Slider, w50 x0 y20 gSetEnableExplore vEnableExplore range0-3
-Gui, 2: Add, Text, x50 y20 w200 vEnableExploreText
+Gui, 2: Add, Text, x50 y20 w100 vEnableExploreText
 Gui, 2: Show, x%xx% y%yy% w200 h40 Hide,Panes settings
 WinSet, ALwaysOnTop, on,Panes settings
-
 Settings_window := WinExist()
+
+; ======================= About:
+
+Gui, 3: +owner -SysMenu +Caption +hWndhGui1 +LastFound 
+Gui, 3: Font, s10, Segoe UI
+Gui, 3: Add, Text,cBlack h50, Panes by AiTechEye`nVersion: %Version%
+Gui, 3: Add, Button, x0 y70 w80 h20 gRepository, Repository
+Gui, 3: Add, Button, x100 y70 w70 h20 gRelseses, Relseses
+Gui, 3: Show, x%xx% y%yy% w200 h100 Hide,About
+
+WinSet, ALwaysOnTop, on,About Panes
+About_window := WinExist()
 
 return
 
@@ -282,12 +303,19 @@ EnableBlur(hWnd) {
 
 
 GuiContextMenu(GuiHwnd, CtrlHwd, EventInfo, IsRightClick, x, y) {
-	Global Objects, AlsoShowThisFolder, PanesIcones
+	Global Objects, AlsoShowThisFolder, PanesIcones, Mouse_pos_x, Mouse_pos_y
 	file := Objects[A_GuiControl]
+;	MouseGetPos gcx, gcxy
+;	SetTimer, Timer, Off
+
+;	Mouse_pos_x := gcxx
+;	Mouse_pos_y := gcxy
 
 	Menu, Menu1, UnCheck,Also show this folder
+	Menu, Menu1, Enable,Open Folder
 
 	if (Instr(FileExist(file),"D")) {
+		Menu, Menu1, Disable,Open Folder
 		Menu, Menu1, Enable,Also show this folder
 		Selected_Folder := file
 		for i, line in AlsoShowThisFolder {
@@ -302,6 +330,7 @@ GuiContextMenu(GuiHwnd, CtrlHwd, EventInfo, IsRightClick, x, y) {
 
 	if (FileExist(file)) {
 		Selected_Item := file
+		Menu, Menu1, Disable,Open Folder
 		Menu, Menu1, Enable,Change Icon
 		Menu, Menu1, UnCheck,Change Icon
 		for i, line in PanesIcones {
@@ -319,19 +348,16 @@ GuiContextMenu(GuiHwnd, CtrlHwd, EventInfo, IsRightClick, x, y) {
 }
 return
 
-
 ChengeIcon:
 	Global Selected_Item
-
 	SetTimer, Timer, Off
 	text := GetSetting("icons-for-items")
 	item := inStr(text,Selected_Item "*")
 	if (item > 0) {
-		iend := inStr(text,item,",")
-		dirico := SubStr(text,item,iend-item+2)
+		iend := inStr(text,",",false,item)
+		dirico := SubStr(text,item,iend-item+1)
 		text := StrReplace(text,dirico,"")
 	} else {
-
 		FileSelectFile, file,,,Select icon file,*.ico
 		SplitPath, file, path, fullfile, filetype, filename
 
@@ -344,8 +370,8 @@ ChengeIcon:
 			return
 		}
 		text := text Selected_Item "*" file ","
-
 	}
+
 	UpdateSetting("icons-for-items",text)
 	PanesIcones := StrSplit(GetSetting("icons-for-items"),",")
 	Gui 1: Destroy
@@ -371,7 +397,24 @@ AlsoShowFolder:
 return
 
 OpenBaseFolder:
+;	Global listed_directories,Mouse_pos_x, Mouse_pos_y
+;	SetTimer, Timer, Off
+;	for i, d in listed_directories {
+;		if (d.y < Mouse_pos_y) {
+;			run, % d.folder ; %Current_folder%
+;			break
+;		}	
+;	}
+;	exitapp
 	run, %Current_folder%
+return
+
+Repository:
+	run, "https://github.com/AiTechEye/Panes"
+return
+
+Relseses:
+	run, "https://github.com/AiTechEye/Panes/releases"
 return
 
 ; Setting Functions: ==============================================
@@ -399,6 +442,16 @@ SettingsTimer:
 	{
 	SetTimer, SettingsTimer, Off
 	Gui, 2: Show, hide
+	WinActivate, ahk_id %GuiID%
+	SetTimer Timer
+	}
+return
+
+AboutTimer:
+	IfWinNotActive ahk_id %About_window%
+	{
+	SetTimer, AboutTimer, Off
+	Gui, 3: Show, hide
 	WinActivate, ahk_id %GuiID%
 	SetTimer Timer
 	}
@@ -449,6 +502,15 @@ ShowSettings:
 	WinSet, ALwaysOnTop, on, A
 	WinActivate, ahk_id %Settings_window%
 	SetTimer SettingsTimer
+return
+
+About:
+	SetTimer, SettingsTimer, Off
+	SetTimer, AboutTimer, On
+	Gui, 2: Show, hide
+	Gui, 3: Show
+	WinSet, ALwaysOnTop, on, A
+	WinActivate, ahk_id %About_window%
 return
 
 UpdateSetting(s,v) {
